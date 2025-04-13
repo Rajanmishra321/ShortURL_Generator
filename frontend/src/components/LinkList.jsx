@@ -156,7 +156,7 @@ export default function LinkList() {
                           className="text-blue-600 hover:text-blue-800 font-medium flex items-center"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {link.shortCode ? link.shortCode.replace('http://localhost:5000/', '') : 'N/A'}
+                          {link.shortCode ? link.shortCode.replace('https://shorturl-generator-xifp.onrender.com/', '') : 'N/A'}
                           <ArrowTopRightOnSquareIcon className="ml-1 h-4 w-4" />
                         </a>
                         <button

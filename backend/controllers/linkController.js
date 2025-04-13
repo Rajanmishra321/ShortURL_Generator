@@ -22,7 +22,7 @@ export const createShortLink = async (req, res) => {
 
     res.status(201).json({
       originalUrl: shortLink.originalUrl,
-      shortUrl: `http://localhost:5000/${shortLink.shortCode}`,
+      shortUrl: `https://shorturl-generator-xifp.onrender.com/${shortLink.shortCode}`,
       clicks: shortLink.clicks
     });
   } catch (error) {

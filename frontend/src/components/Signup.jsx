@@ -21,7 +21,7 @@ export default function Signup({ onSwitch, onSuccess }) {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/signup', {
+      const response = await fetch('https://shorturl-generator-xifp.onrender.com/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
