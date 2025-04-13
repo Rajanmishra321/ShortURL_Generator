@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import Click from '../models/Click.js';
 import geoip from 'geoip-lite';
 import {UAParser} from 'ua-parser-js';
+import { trackClick } from './analyticsController.js';
 
 // Create short link
 export const createShortLink = async (req, res) => {
@@ -38,42 +39,21 @@ export const redirect = async (req, res) => {
       if (!shortLink) return res.status(404).send('Link not found');
   
       // Async analytics (fire-and-forget)
-      trackAnalytics(req, shortLink._id);
+      trackClick(req, shortLink._id).catch(console.error);
   
       res.redirect(shortLink.originalUrl);
     } catch (error) {
       res.status(500).send('Server error');
     }
   };
-  
-  // Separate function for cleaner code
-  const trackAnalytics = async (req, shortLinkId) => {
+
+  export const getLinks = async (req, res) => {
     try {
-      const ip = req.ip || req.connection.remoteAddress;
-      const userAgent = req.get('User-Agent');
-      const parser = new UAParser(userAgent);
-      
-      await Click.create({
-        shortLink: shortLinkId,
-        ipAddress: ip,
-        country: geoip.lookup(ip)?.country,
-        deviceType: getDeviceType(parser),
-        userAgent: userAgent
-      });
-      
-      // Still increment total clicks in ShortLink
-      await ShortLink.updateOne(
-        { _id: shortLinkId },
-        { $inc: { clicks: 1 } }
-      );
-    } catch (err) {
-      console.error('Analytics error:', err);
+      const links = await ShortLink.find({ user: req.user._id });
+      res.json(links);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
     }
   };
+
   
-  // Helper function
-  const getDeviceType = (parser) => {
-    const device = parser.getDevice();
-    if (!device.type) return 'desktop';
-    return device.type;
-  };

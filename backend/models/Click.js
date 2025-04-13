@@ -1,4 +1,3 @@
-// models/Click.js
 import mongoose from 'mongoose';
 
 const clickSchema = new mongoose.Schema({
@@ -11,26 +10,21 @@ const clickSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  userAgent: {
-    type: String,
-    required: false
-  },
-  ipAddress: {
-    type: String,
-    required: false
-  },
-  country: {
-    type: String,
-    required: false
-  },
+  referrer: String,
+  ipAddress: String,
+  country: String,
+  city: String,
   deviceType: {
     type: String,
     enum: ['desktop', 'mobile', 'tablet', 'bot', 'unknown'],
     default: 'unknown'
-  }
+  },
+  browser: String,
+  os: String
 }, { timestamps: true });
 
-// Index for faster querying
-clickSchema.index({ shortLink: 1, clickedAt: -1 });
+// Indexes for faster queries
+clickSchema.index({ shortLink: 1 });
+clickSchema.index({ clickedAt: -1 });
 
 export default mongoose.model('Click', clickSchema);

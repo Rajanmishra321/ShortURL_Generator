@@ -1,67 +1,59 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+  fetchLinks,
+  fetchAnalytics,
+  selectLink
+} from '../redux/linksSlice';
 import {
   ChartBarIcon,
-  ClockIcon,
   TrashIcon,
   QrCodeIcon,
   ArrowTopRightOnSquareIcon,
-  ClipboardDocumentIcon
+  ClipboardDocumentIcon,
+  CalendarIcon,
+  DevicePhoneMobileIcon,
+  ComputerDesktopIcon,
+  GlobeAltIcon
 } from '@heroicons/react/24/outline';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  LineChart, Line, PieChart, Pie, Cell
+} from 'recharts';
 import toast from 'react-hot-toast';
 
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+
 export default function LinkList() {
-  const [links, setLinks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedLink, setSelectedLink] = useState(null);
-  const [analyticsData, setAnalyticsData] = useState(null);
+  const dispatch = useDispatch();
+  const {
+    links,
+    selectedLink,
+    analytics,
+    status,
+    error
+  } = useSelector((state) => state.links);
   const [timeRange, setTimeRange] = useState('7d');
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        
-        // Fetch links
-        const linksRes = await fetch('http://localhost:5000/api/links', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const linksData = await linksRes.json();
-        setLinks(linksData);
+    dispatch(fetchLinks());
+  }, [dispatch]);
 
-        // Fetch analytics for first link by default
-        if (linksData.length > 0) {
-          fetchAnalytics(linksData[0]._id);
-        }
-      } catch (error) {
-        toast.error('Failed to load data');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
-
-  const fetchAnalytics = async (linkId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/analytics/${linkId}?range=${timeRange}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setSelectedLink(linkId);
-      setAnalyticsData(data);
-    } catch (error) {
-      toast.error('Failed to load analytics');
+  useEffect(() => {
+    if (selectedLink) {
+      dispatch(fetchAnalytics({ linkId: selectedLink, range: timeRange }));
     }
-  };
+  }, [selectedLink, timeRange, dispatch]);
 
   const copyToClipboard = (text) => {
+    if (!text) return;
     navigator.clipboard.writeText(text);
     toast.success('Copied to clipboard!');
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -70,7 +62,7 @@ export default function LinkList() {
   };
 
   const getExpirationStatus = (expiresAt) => {
-    if (!expiresAt) return 'Never';
+    if (!expiresAt) return 'Never expires';
     const now = new Date();
     const expDate = new Date(expiresAt);
     return expDate > now ? 
@@ -78,37 +70,22 @@ export default function LinkList() {
       'Expired';
   };
 
-  // Process data for charts
-  const processChartData = (clicks) => {
-    const dailyData = {};
-    const deviceData = {};
-    const browserData = {};
-
-    clicks.forEach(click => {
-      // Date-based data
-      const date = new Date(click.clickedAt).toLocaleDateString();
-      dailyData[date] = (dailyData[date] || 0) + 1;
-
-      // Device data
-      const device = click.deviceType || 'Unknown';
-      deviceData[device] = (deviceData[device] || 0) + 1;
-
-      // Browser data
-      const browser = click.userAgent?.split(' ')[0] || 'Unknown';
-      browserData[browser] = (browserData[browser] || 0) + 1;
-    });
-
-    return {
-      daily: Object.entries(dailyData).map(([date, count]) => ({ date, clicks: count })),
-      devices: Object.entries(deviceData).map(([name, value]) => ({ name, value })),
-      browsers: Object.entries(browserData).map(([name, value]) => ({ name, value }))
-    };
-  };
-
-  if (loading) {
+  if (status === 'loading') {
     return (
       <div className="flex justify-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+        <div className="flex">
+          <div className="ml-3">
+            <p className="text-sm text-red-700">{error.message}</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -168,24 +145,24 @@ export default function LinkList() {
                   <tr 
                     key={link._id} 
                     className={`hover:bg-gray-50 cursor-pointer ${selectedLink === link._id ? 'bg-blue-50' : ''}`}
-                    onClick={() => fetchAnalytics(link._id)}
+                    onClick={() => dispatch(selectLink(link._id))}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <a
-                          href={link.shortUrl}
+                          href={link.shortCode}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-blue-600 hover:text-blue-800 font-medium flex items-center"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {link.shortUrl.replace('http://localhost:5000/', '')}
+                          {link.shortCode ? link.shortCode.replace('http://localhost:5000/', '') : 'N/A'}
                           <ArrowTopRightOnSquareIcon className="ml-1 h-4 w-4" />
                         </a>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            copyToClipboard(link.shortUrl);
+                            copyToClipboard(link.shortCode);
                           }}
                           className="ml-2 p-1 rounded hover:bg-gray-100"
                         >
@@ -207,7 +184,7 @@ export default function LinkList() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <ChartBarIcon className="h-4 w-4 text-gray-500 mr-1" />
-                        <span className="font-medium">{link.clicks}</span>
+                        <span className="font-medium">{link.clicks || 0}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -217,6 +194,8 @@ export default function LinkList() {
                       <span className={`px-2 py-1 text-xs rounded-full ${
                         getExpirationStatus(link.expiresAt).includes('Expires') ? 
                         'bg-green-100 text-green-800' : 
+                        getExpirationStatus(link.expiresAt) === 'Never expires' ?
+                        'bg-blue-100 text-blue-800' :
                         'bg-red-100 text-red-800'
                       }`}>
                         {getExpirationStatus(link.expiresAt)}
@@ -253,80 +232,174 @@ export default function LinkList() {
       </div>
 
       {/* Analytics Dashboard */}
-      {analyticsData && (
-        <div className="bg-white shadow overflow-hidden rounded-xl">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Analytics</h3>
-          </div>
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Clicks Over Time */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="text-md font-medium text-gray-700 mb-4">Clicks Over Time</h4>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={processChartData(analyticsData.clicks).daily}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="clicks" 
-                      stroke="#3b82f6" 
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 5 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Devices */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="text-md font-medium text-gray-700 mb-4">Devices</h4>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={processChartData(analyticsData.clicks).devices}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar 
-                      dataKey="value" 
-                      fill="#3b82f6" 
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Browsers */}
-            <div className="bg-gray-50 p-4 rounded-lg col-span-1 md:col-span-2">
-              <h4 className="text-md font-medium text-gray-700 mb-4">Browsers</h4>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={processChartData(analyticsData.clicks).browsers}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar 
-                      dataKey="value" 
-                      fill="#10b981" 
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-        </div>
+      {analytics && (
+        <AnalyticsDashboard analytics={analytics} />
       )}
+    </div>
+  );
+}
+
+function AnalyticsDashboard({ analytics }) {
+  const chartData = {
+    daily: analytics.dailyClicks || [],
+    devices: (analytics.devices || []).map(item => ({
+      name: item.device,
+      value: item.count
+    })),
+    browsers: (analytics.browsers || []).map(item => ({
+      name: item.browser,
+      value: item.count
+    })),
+    locations: analytics.locations || []
+  };
+
+  return (
+    <div className="bg-white shadow overflow-hidden rounded-xl">
+      <div className="px-6 py-4 border-b border-gray-200">
+        <h3 className="text-lg font-medium text-gray-900">
+          Analytics for: {analytics.linkDetails?.originalUrl || 'Unknown URL'}
+        </h3>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-6">
+        <SummaryCard 
+          icon={<CalendarIcon className="h-6 w-6" />}
+          title="Total Clicks"
+          value={analytics.totalClicks || 0}
+        />
+        <SummaryCard 
+          icon={<DevicePhoneMobileIcon className="h-6 w-6" />}
+          title="Mobile Users"
+          value={chartData.devices.find(d => d.name === 'mobile')?.value || 0}
+        />
+        <SummaryCard 
+          icon={<ComputerDesktopIcon className="h-6 w-6" />}
+          title="Desktop Users"
+          value={chartData.devices.find(d => d.name === 'desktop')?.value || 0}
+        />
+        <SummaryCard 
+          icon={<GlobeAltIcon className="h-6 w-6" />}
+          title="Unique Locations"
+          value={chartData.locations.length}
+        />
+      </div>
+
+      <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        {chartData.daily.length > 0 && (
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h4 className="text-md font-medium text-gray-700 mb-4">Clicks Over Time</h4>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData.daily}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="clicks" 
+                    stroke="#3b82f6" 
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {chartData.devices.length > 0 && (
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h4 className="text-md font-medium text-gray-700 mb-4">Devices</h4>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartData.devices}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    nameKey="name"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {chartData.devices.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {chartData.browsers.length > 0 && (
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h4 className="text-md font-medium text-gray-700 mb-4">Browsers</h4>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData.browsers}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="value" fill="#8884d8" radius={[4, 4, 0, 0]}>
+                    {chartData.browsers.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {chartData.locations.length > 0 && (
+          <div className="bg-gray-50 p-4 rounded-lg col-span-1 md:col-span-2">
+            <h4 className="text-md font-medium text-gray-700 mb-4">Locations</h4>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  layout="vertical"
+                  data={chartData.locations}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="name" type="category" width={100} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#8884d8" radius={[0, 4, 4, 0]}>
+                    {chartData.locations.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SummaryCard({ icon, title, value }) {
+  return (
+    <div className="bg-white p-4 rounded-lg border border-gray-200">
+      <div className="flex items-center">
+        <div className="p-2 rounded-full bg-blue-100 text-blue-600">
+          {icon}
+        </div>
+        <div className="ml-4">
+          <p className="text-sm font-medium text-gray-500">{title}</p>
+          <p className="text-2xl font-semibold">{value}</p>
+        </div>
+      </div>
     </div>
   );
 }
